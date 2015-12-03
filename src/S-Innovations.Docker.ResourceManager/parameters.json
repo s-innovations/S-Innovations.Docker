@@ -1,0 +1,75 @@
+{
+  "resourceLocation": {
+    "type": "string",
+    "metadata": {
+      "description": "Azure region where all resources will be deployed. This is distinct from resource group location."
+    }
+  },
+  "vmssName": {
+    "type": "string",
+    "metadata": {
+      "description": "String used as a base for naming resources (9 characters or less). A hash is prepended to this string for some resources, and resource-specific information is appended."
+    },
+    "maxLength": 9
+  },
+  "adminUsername": {
+    "type": "string",
+    "metadata": {
+      "description": "SSH user for the Virtual Machines."
+    }
+  },
+  "sshPublicKey": {
+    "type": "securestring",
+    "metadata": {
+      "description": "SSH public key for the Virtual Machines."
+    }
+  },
+  "vmSku": {
+    "type": "string",
+    "defaultValue": "Standard_A1",
+    "metadata": {
+      "description": "Size of VMs in the VM Scale Set."
+    }
+  },
+  "ubuntuOSVersion": {
+    "type": "string",
+    "defaultValue": "15.04",
+    "allowedValues": [
+      "15.10",
+      "15.04",
+      "14.04.2-LTS"
+    ],
+    "metadata": {
+      "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version. Allowed values are: 15.04, 14.04.2-LTS."
+    }
+  },
+  "dockerversion": {
+    "type": "string",
+    "defaultValue": "1.0"
+  },
+    "instanceCount": {
+      "type": "int",
+      "metadata": {
+        "description": "Number of VM instances (100 or less)."
+      },
+      "maxValue": 100
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin password on all VMs."
+      }
+    },
+    "nodeCount": {
+      "type": "int",
+      "defaultValue": 3,
+      "metadata": {
+        "description": "Number of master nodes"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_A0",
+      "minLength": 1
+    }
+  }

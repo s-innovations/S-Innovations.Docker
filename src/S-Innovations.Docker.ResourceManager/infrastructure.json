@@ -1,0 +1,80 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01-preview/deploymentTemplate.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceLocation": { },
+    "vmssName": { },
+  },
+  "variables": {
+    "subnetName": "",
+    "uniqueStringArray": "",
+    "virtualNetworkName": "",
+    "vmssName": "",
+    "storageAccountType": "",
+    "apiVersion": "",
+    "saCount": "",
+    "subnetPrefix": "",
+    "addressPrefix": "",
+    "publicIPAddressName": "",
+    "accountid": "",
+    "diagnosticsStorageAccountName": ""
+  },
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('diagnosticsStorageAccountName')]"
+    },
+    "storageAccountKey": {
+      "type": "string",
+      "value": "[listkeys(variables('accountid'), variables('apiVersion')).key1]",
+    }
+  },
+    "resources": [
+      {
+        "type": "Microsoft.Network/virtualNetworks",
+        "name": "[variables('virtualNetworkName')]",
+        "location": "[parameters('resourceLocation')]",
+        "apiVersion": "[variables('apiVersion')]",
+        "properties": {
+          "addressSpace": {
+            "addressPrefixes": [
+              "[variables('addressPrefix')]"
+            ]
+          },
+          "subnets": [
+            {
+              "name": "[variables('subnetName')]",
+              "properties": {
+                "addressPrefix": "[variables('subnetPrefix')]"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Microsoft.Storage/storageAccounts",
+        "name": "[variables('uniqueStringArray')[copyIndex()]]",
+        "location": "[parameters('resourceLocation')]",
+        "apiVersion": "[variables('apiVersion')]",
+        "copy": {
+          "name": "storageLoop",
+          "count": "[variables('saCount')]"
+        },
+        "properties": {
+          "accountType": "[variables('storageAccountType')]"
+        }
+      },
+      {
+        "type": "Microsoft.Network/publicIPAddresses",
+        "name": "[variables('publicIPAddressName')]",
+        "location": "[parameters('resourceLocation')]",
+        "apiVersion": "[variables('apiVersion')]",
+        "properties": {
+          "publicIPAllocationMethod": "Dynamic",
+          "dnsSettings": {
+            "domainNameLabel": "[parameters('vmssName')]"
+          }
+        }
+      }
+    ]
+  }
