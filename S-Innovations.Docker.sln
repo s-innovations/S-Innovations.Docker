@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F1547851-3DE8-4682-9110-D41CE32542E7}"
+	ProjectSection(SolutionItems) = preProject
+		S-Innovations.Docker.ResourceManager\global.json = S-Innovations.Docker.ResourceManager\global.json
+		src\S-Innovations.Docker.ResourceManager\global.json = src\S-Innovations.Docker.ResourceManager\global.json
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S-Innovations.Docker.Tests", "tests\S-Innovations.Docker.Tests\S-Innovations.Docker.Tests.csproj", "{C67DA537-DA8D-408C-9303-AC7D21E193AD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S-Innovations.Docker.ResourceManager", "src\S-Innovations.Docker.ResourceManager\S-Innovations.Docker.ResourceManager.csproj", "{9E303C5D-0712-4EB6-A6FA-37DE9023B3C3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S-Innovations.Docker.SwarmManager", "src\S-Innovations.Docker.SwarmManager\S-Innovations.Docker.SwarmManager.csproj", "{CAEFEAF4-28D3-454B-B3A6-DE26BD19720D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C67DA537-DA8D-408C-9303-AC7D21E193AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C67DA537-DA8D-408C-9303-AC7D21E193AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C67DA537-DA8D-408C-9303-AC7D21E193AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C67DA537-DA8D-408C-9303-AC7D21E193AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E303C5D-0712-4EB6-A6FA-37DE9023B3C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E303C5D-0712-4EB6-A6FA-37DE9023B3C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E303C5D-0712-4EB6-A6FA-37DE9023B3C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E303C5D-0712-4EB6-A6FA-37DE9023B3C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAEFEAF4-28D3-454B-B3A6-DE26BD19720D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAEFEAF4-28D3-454B-B3A6-DE26BD19720D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAEFEAF4-28D3-454B-B3A6-DE26BD19720D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAEFEAF4-28D3-454B-B3A6-DE26BD19720D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
