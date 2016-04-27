@@ -2,13 +2,16 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Azure;
+using Microsoft.Azure.KeyVault;
 using Microsoft.Azure.Management.Resources;
 using Microsoft.Azure.Management.Resources.Models;
-using Microsoft.Azure.Subscriptions;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.Rest;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -18,8 +21,85 @@ namespace SInnovations.Docker.ResourceManager
     // To enable this option, right-click on the project and select the Properties menu item. In the Build tab select "Produce outputs on build".
     public class ResourceManagerHelper
     {
-      
-         public static AuthenticationResult GetAuthorizationHeader(string tenant, string clientId,string secret, string redirectUrl=null)
+
+        public static JObject CreateValue(string value)
+        {
+            return new JObject(new JProperty("value", value));
+        }
+        public static JProperty CreateValue(string key, JToken value)
+        {
+            return new JProperty(key, new JObject(new JProperty("value", value)));
+        }
+        public static void CreateSSHKey()
+        {
+            Chilkat.SshKey key = new Chilkat.SshKey();
+       
+            bool success;
+            int numBits;
+            int exponent;
+            numBits = 2048;
+            exponent = 65537;
+            success = key.GenerateRsaKey(numBits, exponent);
+            var pub = key.ToOpenSshPublicKey();
+            var pri = key.ToOpenSshPrivateKey(false);
+           
+
+        }
+        public static async Task<Tuple<string,string>> CreateSSHKeyPair(string keyvaultUri,string name)
+        {
+            var keyVaultClient = new KeyVaultClient((r, c, s) =>
+            {
+                //   return Task.FromResult(options.AccessToken);
+                var context = new AuthenticationContext(r, new FileCache());
+                //var result = context.AcquireTokenByRefreshToken(options.RefreshToken,options.CliendId,c);
+                var result = context.AcquireToken(c, "1950a258-227b-4e31-a9cf-717495945fc2", new Uri("urn:ietf:wg:oauth:2.0:oob"));
+                return Task.FromResult(result.AccessToken);
+            });
+            var exists = await keyVaultClient.GetSecretsAsync(keyvaultUri);
+            string pubKey = "", priKey = "";
+            if (exists.Value == null || !exists.Value.Any(v => v.Identifier.Name == name))
+            {
+                Chilkat.SshKey key = new Chilkat.SshKey();
+
+                bool success;
+                int numBits;
+                int exponent;
+                numBits = 2048;
+                exponent = 65537;
+                success = key.GenerateRsaKey(numBits, exponent);
+                var pub = Convert.ToBase64String(Encoding.UTF8.GetBytes(pubKey = key.ToOpenSshPublicKey()));
+                var pri = Convert.ToBase64String(Encoding.UTF8.GetBytes(priKey = key.ToOpenSshPrivateKey(false)));
+
+                await keyVaultClient.SetSecretAsync(keyvaultUri,
+                    name, $"{pub}.{pri}", new Dictionary<string, string>
+                    {
+
+                    });
+                return new Tuple<string, string>(pubKey,priKey);
+
+            }
+            var secret = await keyVaultClient.GetSecretAsync(keyvaultUri, name);
+          
+            return new Tuple<string, string>(Encoding.UTF8.GetString(Convert.FromBase64String(secret.Value.Split('.')[0])), Encoding.UTF8.GetString(Convert.FromBase64String(secret.Value.Split('.')[1])));
+        }
+        public static async Task<DeploymentExtended> CreateKeyVaultAsync(ApplicationCredentials options, string resouceGroupName, string location = "West Europe")
+        {
+            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, options.AccessToken, resouceGroupName, location);
+            var templateStr = new StreamReader(ResourceManagerHelper.Read("SInnovations.Docker.ResourceManager.keyvault.json")).ReadToEnd();
+            var deployment = ResourceManagerHelper.CreateTemplateDeploymentAsync(options.SubscriptionId, options.AccessToken, rg.Name, "keyvault",
+                               templateStr,
+
+                                new JObject(
+
+                                    ResourceManagerHelper.CreateValue("location", location),
+                                    ResourceManagerHelper.CreateValue("tenantId", options.TenantId),
+                                    ResourceManagerHelper.CreateValue("objectId", options.ObjectId)                                   
+                                    ).ToString()).GetAwaiter().GetResult();
+        
+            return deployment;
+          
+        }
+        public static AuthenticationResult GetAuthorizationHeader(string tenant, string clientId,string secret, string redirectUrl=null)
         {
             if (!string.IsNullOrEmpty(secret))
             {
@@ -61,18 +141,15 @@ namespace SInnovations.Docker.ResourceManager
             return token.AccessToken;
         }
 
-        public async static Task ListSubscriptions(string azureToken)
+        public async static Task<Subscription[]> ListSubscriptions(string azureToken)
         {
             {
-                using (var subscriptionClient = new SubscriptionClient(new TokenCloudCredentials(azureToken)))
+                
+                using (var subscriptionClient = new SubscriptionClient(new TokenCredentials(azureToken)))
                 {
-                    var subscriptions = await subscriptionClient.Subscriptions.ListAsync();
-
-                    foreach (var subscription in subscriptions.Subscriptions)
-                    {
-                        
-                        Console.WriteLine(JsonConvert.SerializeObject(await subscriptionClient.Subscriptions.GetAsync(subscription.SubscriptionId), Formatting.Indented));
-                    }
+                    subscriptionClient.SubscriptionId = "";
+                     var subscriptions = await subscriptionClient.Subscriptions.ListAsync();
+                    return subscriptions.ToArray();
 
 
                 }
@@ -152,67 +229,119 @@ namespace SInnovations.Docker.ResourceManager
                 return true;
             };
         }
-
-        public async static Task<ResourceGroupExtended> CreateResourceGroupIfNotExist(string subscriptionId, string token, string resourceGroupName,string location)
+        public async static Task<ResourceGroup[]> ListResourceGroups(string subscriptionId, string token)
         {
-            TokenCloudCredentials credential = new TokenCloudCredentials(subscriptionId, token);
-            var resourceGroup = new ResourceGroup { Location = location };
+            ServiceClientCredentials credential = new TokenCredentials(token);
+          //  var resourceGroup = new ResourceGroup { Location = location, Tags = new Dictionary<string, string> { { "source", "SInnovations.Docker.ResourceManager" } } };
             using (var resourceManagementClient = new ResourceManagementClient(credential))
             {
-                var rgResult = await resourceManagementClient.ResourceGroups.CreateOrUpdateAsync(resourceGroupName, resourceGroup);
-                return rgResult.ResourceGroup;
+                resourceManagementClient.SubscriptionId = subscriptionId;
+                var rgResult = await resourceManagementClient.ResourceGroups.ListAsync(rg=>rg.TagName == "source" && rg.TagValue == "SInnovations.Docker.ResourceManager");
+                return rgResult.ToArray();
             }
         }
-        public async static Task DeleteIfExists(string subscriptionId, string token, string resourceGroupName, string location)
+        public async static Task<ResourceGroup> CreateResourceGroupIfNotExistAsync(string subscriptionId, string token, string resourceGroupName,string location)
         {
-            TokenCloudCredentials credential = new TokenCloudCredentials(subscriptionId, token);
-            var resourceGroup = new ResourceGroup { Location = location };
+            ServiceClientCredentials credential = new TokenCredentials(token);
+            var resourceGroup = new ResourceGroup { Location = location, Tags = new Dictionary<string, string> { { "source", "SInnovations.Docker.ResourceManager" } } };
             using (var resourceManagementClient = new ResourceManagementClient(credential))
             {
-                var rgResult = await resourceManagementClient.ResourceGroups.DeleteAsync(resourceGroupName);
+                resourceManagementClient.SubscriptionId = subscriptionId;
+                if (!(await resourceManagementClient.ResourceGroups.CheckExistenceAsync(resourceGroupName) ?? false))
+                {
+                    return await resourceManagementClient.ResourceGroups.CreateOrUpdateAsync(resourceGroupName, resourceGroup);
+                }
+
+                return await resourceManagementClient.ResourceGroups.GetAsync(resourceGroupName);
+            }
+        }
+        public async static Task DeleteIfExists(string subscriptionId, string token, string resourceGroupName)
+        {
+           
+           
+            using (var resourceManagementClient = new ResourceManagementClient(new TokenCredentials(token)))
+            {
+                resourceManagementClient.SubscriptionId = subscriptionId;
+                await resourceManagementClient.ResourceGroups.DeleteAsync(resourceGroupName);
              
             }
         }
         public async static Task DeleteTemplateDeployment(string subscriptionId, string token, string resourceGroup, string deploymentName)
         {
-            TokenCloudCredentials credential = new TokenCloudCredentials(subscriptionId, token);
-            using (var templateDeploymentClient = new ResourceManagementClient(credential))
+          
+            using (var templateDeploymentClient = new ResourceManagementClient(new TokenCredentials(token)))
             {
+                templateDeploymentClient.SubscriptionId = subscriptionId;
 
-              var result=  await templateDeploymentClient.Deployments.DeleteAsync(resourceGroup, deploymentName);
+               await templateDeploymentClient.Deployments.DeleteAsync(resourceGroup, deploymentName);
 
              
             }
         }
+        public static string CalculateMD5Hash(string input)
+        {
+            // step 1, calculate MD5 hash from input
+            MD5 md5 = System.Security.Cryptography.MD5.Create();
+            byte[] inputBytes = System.Text.Encoding.ASCII.GetBytes(input);
+            byte[] hash = md5.ComputeHash(inputBytes);
+
+            // step 2, convert byte array to hex string
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < hash.Length; i++)
+            {
+                sb.Append(hash[i].ToString("X2"));
+            }
+            return sb.ToString();
+        }
+       
         public async static Task<DeploymentExtended> CreateTemplateDeploymentAsync(string subscriptionId, string token, string resourceGroup, string deploymentName, string template, string parameters, bool waitForDeployment =true)
         {
-            TokenCloudCredentials credential = new TokenCloudCredentials(subscriptionId, token);
 
+            var hash = CalculateMD5Hash(template + parameters);
             var deployment = new Deployment();
+           
             deployment.Properties = new DeploymentProperties
             {
-                Mode = DeploymentMode.Complete,
-                Template = template,
-                Parameters = parameters            
+                Mode = DeploymentMode.Incremental,
+                Template = JObject.Parse(template),
+                Parameters = JObject.Parse(parameters)       
             };
-            using (var templateDeploymentClient = new ResourceManagementClient(credential))
+            using (var templateDeploymentClient = new ResourceManagementClient(new TokenCredentials(token)))
             {
-                var result = await templateDeploymentClient.Deployments.ValidateAsync(resourceGroup, deploymentName, deployment);
-                if (!result.IsValid)
-                {
-                    throw new Exception(result.Error.Message);
-                }
-                var dpResult = await templateDeploymentClient.Deployments.CreateOrUpdateAsync(resourceGroup, deploymentName, deployment);
-                var deploymentResult = dpResult.Deployment;
-                
-                while ( waitForDeployment && !(deploymentResult.Properties.ProvisioningState == "Failed" || deploymentResult.Properties.ProvisioningState == "Succeeded"))
-                {
-                    var deploymentResultWrapper = await templateDeploymentClient.Deployments.GetAsync(resourceGroup, dpResult.Deployment.Name);
+                templateDeploymentClient.SubscriptionId = subscriptionId;
 
-                    deploymentResult = deploymentResultWrapper.Deployment;
-                    await Task.Delay(5000);
+                var rg = await templateDeploymentClient.ResourceGroups.GetAsync(resourceGroup);
+                if (!(rg.Tags.ContainsKey(deploymentName) && rg.Tags[deploymentName] == hash && ((await templateDeploymentClient.Deployments.CheckExistenceAsync(resourceGroup, deploymentName)) ?? false)))
+                {
+
+
+              
+                    var result = await templateDeploymentClient.Deployments.ValidateAsync(resourceGroup, deploymentName, deployment);
+
+                  
+
+                    var deploymentResult = await templateDeploymentClient.Deployments.CreateOrUpdateAsync(resourceGroup,
+                        deploymentName, deployment);
+
+                    rg.Tags.Add(deploymentName, hash);
+                    await templateDeploymentClient.ResourceGroups.CreateOrUpdateAsync(resourceGroup, rg);
+
+                    while (waitForDeployment && !(deploymentResult.Properties.ProvisioningState == "Failed" || deploymentResult.Properties.ProvisioningState == "Succeeded"))
+                    {
+                        var deploymentResultWrapper = await templateDeploymentClient.Deployments.GetAsync(resourceGroup, deploymentResult.Name);
+
+                        deploymentResult = deploymentResultWrapper;
+                        await Task.Delay(5000);
+                    }
+                   
+                    return deploymentResult;
                 }
-                return deploymentResult;
+                else {
+
+                    var deploymentResult = await templateDeploymentClient.Deployments.GetAsync(resourceGroup, deploymentName);
+                    return deploymentResult;
+                }
+
             }
 
         }

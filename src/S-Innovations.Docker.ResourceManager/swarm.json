@@ -20,6 +20,15 @@
       "metadata": {
         "description": "Number of Swarm worker nodes in the cluster."
       }
+    },
+    "dockerHubUsername": {
+      "type": "string"
+    },
+    "dockerHubPassword": {
+      "type": "securestring"
+    },
+    "dockerHubEmail": {
+      "type": "string"
     }
   },
   "variables": {
@@ -599,9 +608,9 @@
         "typeHandlerVersion": "1.0",
         "protectedSettings": {
           "login": {
-            "username": "pksorensen",
-            "password": "zZE3VzwD",
-            "email": "pks@s-innovations.net"
+            "username": "[parameters('dockerHubUserName')]",
+            "password": "[parameters('dockerHubPassword')]",
+            "email": "[parameters('dockerHubEmail')]"
           }
         },
         "settings": {
@@ -648,29 +657,21 @@
     }
   ],
   "outputs": {
-    "sshTunnelCmd": {
+    "storageAccountName": {
       "type": "string",
-      "value": "[concat('ssh -L 2375:swarm-master-0:2375 -N ', parameters('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -p 2200')]"
+      "value": "[variables('newStorageAccountName')]"
     },
-    "dockerCmd": {
+    "storageAccountKey": {
       "type": "string",
-      "value": "docker -H tcp://localhost:2375 info"
+      "value": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('newStorageAccountName')), '2015-05-01-preview').key1]"
     },
-    "swarmNodesLoadBalancerAddress": {
+    "masterHostName": {
       "type": "string",
-      "value": "[reference(variables('nodesPublicIPAddrName')).dnsSettings.fqdn]"
+      "value": "[concat(variables('clusterFqdn'), '-manage')]"
     },
-    "sshMaster0": {
+    "nodesHostName": {
       "type": "string",
-      "value": "[concat('ssh ', parameters('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -A -p 2200')]"
-    },
-    "sshMaster1": {
-      "type": "string",
-      "value": "[concat('ssh ', parameters('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -A -p 2201')]"
-    },
-    "sshMaster2": {
-      "type": "string",
-      "value": "[concat('ssh ', parameters('adminUsername'), '@', reference(variables('managementPublicIPAddrName')).dnsSettings.fqdn, ' -A -p 2202')]"
+      "value": "[variables('clusterFqdn')]"
     }
   }
 }

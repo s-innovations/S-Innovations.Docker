@@ -15,6 +15,8 @@ using Newtonsoft.Json.Serialization;
 using SInnovations.Docker.ResourceManager;
 
 using System.Linq;
+using Microsoft.Rest;
+
 namespace SInnovations.Docker.Tests
 {
     [TestClass]
@@ -51,7 +53,7 @@ namespace SInnovations.Docker.Tests
             var resourceGroupName = "docker-rg-test";
             var vaultName = "blabla";
             var location = "West Europe";
-            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExist(subscriptionid, token, resourceGroupName, location);
+            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(subscriptionid, token, resourceGroupName, location);
 
             var authContext = new AuthenticationContext($"https://login.windows.net/{tenantId}");
             var graphtoken = authContext.AcquireToken("https://graph.windows.net/", new ClientCredential(clientid, secret));
@@ -104,17 +106,19 @@ namespace SInnovations.Docker.Tests
 
             //await ResourceManagerHelper.DeleteTemplateDeployment(subscriptionid, token, resourceGroupName, "test");
 
-            using (var resourceManagementClient = new ResourceManagementClient(new TokenCloudCredentials(subscriptionid, token)))
+            using (var resourceManagementClient = new ResourceManagementClient(new TokenCredentials(token)))
             {
+                resourceManagementClient.SubscriptionId = subscriptionid;
+               
                 resourceManagementClient.ResourceGroups.Delete(resourceGroupName);
-                var vaults = resourceManagementClient.Resources.List(new ResourceListParameters { ResourceType = "Microsoft.KeyVault/vaults", ResourceGroupName = resourceGroupName });
-                foreach (var vault in vaults.Resources)
+                var vaults = resourceManagementClient.Resources.List(f=>f.ResourceType == "Microsoft.KeyVault/vaults");
+                foreach (var vault in vaults)
                 {
                     //                    var a = resourceManagementClient.ResourceProviderOperationDetails.List(new ResourceIdentity(vault.Name, vault.Type, "2015-06-01"));
                     var resourceProvider = resourceManagementClient.Providers.Get(vault.Type.Substring(0, vault.Type.IndexOf("/")));
-                    var a = resourceProvider.Provider.ResourceTypes.Single(k => k.Name == vault.Type.Substring(vault.Type.IndexOf("/") + 1));
+                    var a = resourceProvider.ResourceTypes.Single(k => k.ResourceType == vault.Type.Substring(vault.Type.IndexOf("/") + 1));
                     var version = a.ApiVersions.First();
-                    resourceManagementClient.Resources.Delete(resourceGroupName, new ResourceIdentity(vault.Name, vault.Type, version));
+                  //  resourceManagementClient.Resources.Delete(resourceGroupName, new ResourceIdentity(vault.Name, vault.Type, version).ResourceProviderNamespace,);
                 }
             }
 
@@ -124,45 +128,47 @@ namespace SInnovations.Docker.Tests
             //  Console.WriteLine(test);
         }
 
-        private static async Task CreateUsingManagementLibraries(string clientid, string secret, string tenantId, string token, string subscriptionid, string resourceGroupName, string vaultName, ResourceGroup rg)
-        {
-            using (var client = new KeyVaultManagementClient(new TokenCloudCredentials(subscriptionid, token)))
-            {
-                using (var resourceManagementClient = new ResourceManagementClient(client.Credentials))
-                {
-                    var authContext = new AuthenticationContext($"https://login.windows.net/{tenantId}");
-                    var graphtoken = authContext.AcquireToken("https://graph.windows.net/", new ClientCredential(clientid, secret));
-                    var graph = new ActiveDirectoryClient(new Uri("https://graph.windows.net/" + tenantId), () => Task.FromResult(graphtoken.AccessToken));
-                    var principals = await graph.ServicePrincipals.Where(p => p.AppId == clientid).ExecuteSingleAsync();
+        //private static async Task CreateUsingManagementLibraries(string clientid, string secret, string tenantId, string token, string subscriptionid, string resourceGroupName, string vaultName, ResourceGroup rg)
+        //{
+        //    using (var client = new KeyVaultManagementClient(new TokenCloudCredentials(subscriptionid, token)))
+        //    {
+        //        using (var resourceManagementClient = new ResourceManagementClient(new TokenCredentials(token)))
+        //        {
+        //            resourceManagementClient.SubscriptionId = subscriptionid;
+
+        //            var authContext = new AuthenticationContext($"https://login.windows.net/{tenantId}");
+        //            var graphtoken = authContext.AcquireToken("https://graph.windows.net/", new ClientCredential(clientid, secret));
+        //            var graph = new ActiveDirectoryClient(new Uri("https://graph.windows.net/" + tenantId), () => Task.FromResult(graphtoken.AccessToken));
+        //            var principals = await graph.ServicePrincipals.Where(p => p.AppId == clientid).ExecuteSingleAsync();
 
 
-                    resourceManagementClient.Providers.Register("Microsoft.KeyVault");
-                    var vaults = resourceManagementClient.Resources.List(new ResourceListParameters { ResourceType = "Microsoft.KeyVault/vaults", ResourceGroupName = resourceGroupName });
+        //            resourceManagementClient.Providers.Register("Microsoft.KeyVault");
+        //            var vaults = resourceManagementClient.Resources.List(new ResourceListParameters { ResourceType = "Microsoft.KeyVault/vaults", ResourceGroupName = resourceGroupName });
 
-                    Console.WriteLine(JsonConvert.SerializeObject(
-                                    client.Vaults.CreateOrUpdate(resourceGroupName, vaultName, new VaultCreateOrUpdateParameters
-                                    {
-                                        Properties = new VaultProperties
-                                        {
-                                            EnabledForDeployment = true,
-                                            Sku = new Sku { Name = "Premium", Family = "A" },
-                                            AccessPolicies = new List<AccessPolicyEntry>{
-                                            new AccessPolicyEntry{
-                                                 TenantId = Guid.Parse(tenantId),
-                                                 ObjectId = Guid.Parse(principals.ObjectId),
-                                                 PermissionsToSecrets=new []{"all"},
-                                                  PermissionsToKeys = new []{"all"}
-                                            },
-                                            },
-                                            TenantId = Guid.Parse(tenantId)
-                                        },
-                                        Location = rg.Location,
+        //            Console.WriteLine(JsonConvert.SerializeObject(
+        //                            client.Vaults.CreateOrUpdate(resourceGroupName, vaultName, new VaultCreateOrUpdateParameters
+        //                            {
+        //                                Properties = new VaultProperties
+        //                                {
+        //                                    EnabledForDeployment = true,
+        //                                    Sku = new Sku { Name = "Premium", Family = "A" },
+        //                                    AccessPolicies = new List<AccessPolicyEntry>{
+        //                                    new AccessPolicyEntry{
+        //                                         TenantId = Guid.Parse(tenantId),
+        //                                         ObjectId = Guid.Parse(principals.ObjectId),
+        //                                         PermissionsToSecrets=new []{"all"},
+        //                                          PermissionsToKeys = new []{"all"}
+        //                                    },
+        //                                    },
+        //                                    TenantId = Guid.Parse(tenantId)
+        //                                },
+        //                                Location = rg.Location,
 
-                                    }),
-                                 Formatting.Indented));
+        //                            }),
+        //                         Formatting.Indented));
 
-                }
-            }
-        }
+        //        }
+        //    }
+        //}
     }
 }

@@ -42,7 +42,7 @@ namespace SInnovations.Docker.Tests
         {
 
             var token = ResourceManagerHelper.GetAuthorizationHeader(options);
-            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExist(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
+            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
 
         }
         private static JObject CreateValue(string value)
@@ -57,7 +57,7 @@ namespace SInnovations.Docker.Tests
         public async Task CreateInfrastructure()
         {
             var token = ResourceManagerHelper.GetAuthorizationHeader(options);
-            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExist(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
+            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
 
             var templateStr = ResourceManagerHelper.LoadTemplate(
                 "SInnovations.Docker.ResourceManager.infrastructure.json",
@@ -75,7 +75,7 @@ namespace SInnovations.Docker.Tests
                         new JProperty("vmssName", CreateValue(name))
                         ).ToString()
             );
-            var outputs = JObject.Parse(deployment.Properties.Outputs);
+            var outputs = JObject.FromObject(deployment.Properties.Outputs);
             var storage = new CloudStorageAccount(new StorageCredentials(outputs["storageAccountName"]["value"].ToString(),
                 outputs["storageAccountKey"]["value"].ToString()), true);
             var setup = storage.CreateCloudBlobClient().GetContainerReference("setup");
@@ -94,19 +94,35 @@ namespace SInnovations.Docker.Tests
         [TestMethod]
         public async Task DeploySwarm()
         {
-            var rgName = "demo-swarm-60";
+
+            Chilkat.SshKey key = new Chilkat.SshKey();
+
+            bool success;
+            int numBits;
+            int exponent;
+            numBits = 2048;
+            exponent = 65537;
+            success = key.GenerateRsaKey(numBits, exponent);
+            var pub = key.ToOpenSshPublicKey();
+            var pub64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(pub));
+            var pri = Convert.ToBase64String(Encoding.UTF8.GetBytes(key.ToOpenSshPrivateKey(false)));
+            var keyPair = $"{pub64}.{pri}";
+            var pub1 = Encoding.UTF8.GetString(Convert.FromBase64String(keyPair.Split('.')[0]));
+            Assert.AreEqual(pub, pub1);
+            return;
+            var rgName = "demo-swarm-100";
 
             var token = ResourceManagerHelper.GetAuthorizationHeader(options);
-            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExist(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
+            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
             var templateStr = new StreamReader(ResourceManagerHelper.Read("SInnovations.Docker.ResourceManager.swarm.json")).ReadToEnd();
             var deployment = await ResourceManagerHelper.CreateTemplateDeploymentAsync(options.SubscriptionId, token.AccessToken, rg.Name, "masterNodes",
                                templateStr,
 
                                 new JObject(
 
-                                    CreateValue("nodeCount", 6),
+                                    CreateValue("nodeCount", 3),
                                     CreateValue("adminUsername", "pksorensen"),
-                                     new JProperty("sshPublicKey", CreateValue("ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA9V7aWJA/5UlOGAUaz9BhVmrW0mPrlodO8NNWdku1bh5AwauK/iP05FKmwC16Ou150DCw8SxA1LBAKvRgEzwMj9auXe9mklIx7hgCds2kCuDzSJAZB70a8xNF+Os8LZvk/MSKNdvAj6b0wI60IdJqu8WxF5/wHxTd/u1GFpPM0Y1jPwqJMk21giKZ5gb1q+WWJUqAOKWkxQpqcN39zznZEn9D6QMBshqWidYnL1+L6riGd9GZKKd4roac8QO6suuCZJDqaH162V1qTkRghunzdHr6qarC49FenU7+yweBesKFfR+411BABix54zpESYQiV4s/uXLZ3w90uHSMQROUhw== rsa-key-20151110"))
+                                     new JProperty("sshPublicKey", CreateValue(pub)) //CreateValue("ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA9V7aWJA/5UlOGAUaz9BhVmrW0mPrlodO8NNWdku1bh5AwauK/iP05FKmwC16Ou150DCw8SxA1LBAKvRgEzwMj9auXe9mklIx7hgCds2kCuDzSJAZB70a8xNF+Os8LZvk/MSKNdvAj6b0wI60IdJqu8WxF5/wHxTd/u1GFpPM0Y1jPwqJMk21giKZ5gb1q+WWJUqAOKWkxQpqcN39zznZEn9D6QMBshqWidYnL1+L6riGd9GZKKd4roac8QO6suuCZJDqaH162V1qTkRghunzdHr6qarC49FenU7+yweBesKFfR+411BABix54zpESYQiV4s/uXLZ3w90uHSMQROUhw== rsa-key-20151110"))
 
                                     ).ToString());
             Console.WriteLine(deployment.Properties.Outputs);
@@ -117,7 +133,7 @@ namespace SInnovations.Docker.Tests
         [TestMethod]
         public async Task DeployHitRate()
         {
-            int testCount = 5;
+            int testCount = 1;
             var machineCount = 5;
             var tests = new List<Task>();
             var failed = 0;
@@ -133,7 +149,7 @@ namespace SInnovations.Docker.Tests
                     var rgName = "demo-vmss-pks-60" + i;
                     var name = "pks8" + i;
                     var token = ResourceManagerHelper.GetAuthorizationHeader(options);
-                    var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExist(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
+                    var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
                     //  var templateStr = new StreamReader(ResourceManagerHelper.Read("SInnovations.Docker.ResourceManager.workingtemplate.json")).ReadToEnd();
 
                     var cred = new TokenCredentials(token.AccessToken);
@@ -242,7 +258,7 @@ namespace SInnovations.Docker.Tests
                         Console.WriteLine(output.ToString());
                     }
 
-                    await ResourceManagerHelper.DeleteIfExists(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
+                 //   await ResourceManagerHelper.DeleteIfExists(options.SubscriptionId, token.AccessToken, rgName);
 
 
                 }));
@@ -259,7 +275,7 @@ namespace SInnovations.Docker.Tests
         {
             await CreateInfrastructure();
             var token = ResourceManagerHelper.GetAuthorizationHeader(options);
-            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExist(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
+            var rg = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, token.AccessToken, rgName, "West Europe");
 
             var templateStr = ResourceManagerHelper.LoadTemplates(
                new[] { "SInnovations.Docker.ResourceManager.infrastructure.json",
@@ -322,7 +338,7 @@ namespace SInnovations.Docker.Tests
             {
                 computeManagementClient.SubscriptionId = options.SubscriptionId;
                 var rgName_ = rgName;
-                var resourceGroup = await ResourceManagerHelper.CreateResourceGroupIfNotExist(options.SubscriptionId, token.AccessToken, rgName_, "West Europe");
+                var resourceGroup = await ResourceManagerHelper.CreateResourceGroupIfNotExistAsync(options.SubscriptionId, token.AccessToken, rgName_, "West Europe");
 
                 var test = await computeManagementClient.VirtualMachineScaleSets.ListAllWithHttpMessagesAsync();
                 //  resourceManagementClient.VirtualMachineExtensions.c

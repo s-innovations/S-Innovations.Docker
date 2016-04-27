@@ -13,5 +13,8 @@ namespace SInnovations.Docker.ResourceManager
         public string Secret { get; set; }
         public string SubscriptionId { get; set; }
         public string TenantId { get; set; }
+        public string ObjectId { get; set; }
+        public string AccessToken { get; set; }
+        public string RefreshToken { get; set; }
     }
 }
